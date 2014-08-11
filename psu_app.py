@@ -14,6 +14,12 @@ mxd = arcpy.mapping.MapDocument(r"CURRENT")
 global df
 df = arcpy.mapping.ListDataFrames(mxd, "Layers")[0]
 
+
+def delete():
+    #do something
+    return
+
+
 # Select a specific state
 def select():
     items = map(int, listbox.curselection())
