@@ -31,12 +31,12 @@ def select():
     arcpy.mapping.RemoveLayer(df, countylyr)
     #Add and calculate population & weighted income
     arcpy.AddField_management(layer1, "POPULATION", "DOUBLE", "", "", "", "", "NULLABLE", "", "")
-    arcpy.CalculateField_management(layer1, "POPULATION", "!POP!/ !ALANDSQM!", "PYTHON")
+    arcpy.CalculateField_management(layer1, "POPULATION", "!POP!*!ALANDSQM!", "PYTHON")
     arcpy.AddField_management(layer1, "WTDINCOME", "DOUBLE", "", "", "", "", "NULLABLE", "", "")
-    arcpy.CalculateField_management(layer1, "WTDINCOME", "!INCOME!* !POP!", "PYTHON")
+    arcpy.CalculateField_management(layer1, "WTDINCOME", "!INCOME!*!POP!", "PYTHON")
 
     #Apply natural breaks from pre-defined symbologyLayer
-    symbologyLayer = "C:\Users\zwhitman\Documents\census\psu_app\input\NaturalBreaksSym.lyr"
+    symbologyLayer = "C:\Users\sflecher\Documents\Projects\CENSUS\PSU_App\NaturalBreaksSym.lyr"
     arcpy.ApplySymbologyFromLayer_management(layer1, symbologyLayer)
 
     #Create variables from break points
@@ -52,7 +52,7 @@ def select():
     arcpy.AddField_management(lyr, "POPRANK", "TEXT", "", "", "1", "", "NULLABLE", "", "")
 
     calcstate1 = str("def calc(pop):\\n if pop >= %f:\\n  return 'A'\\n else:\\n  if pop >= %f:\\n   return 'B'\\n  elif pop >= %f:\\n   return 'C'\\n  else:\\n   return 'O'")
-    arcpy.CalculateField_management(lyr, "POPRANK", "calc(!POPULATION!)", "PYTHON", calcstate1 % (breakpt3pop, breakpt2pop, breakpt1pop))
+    arcpy.CalculateField_management(lyr, "POPRANK", "calc(!POP!)", "PYTHON", calcstate1 % (breakpt3pop, breakpt2pop, breakpt1pop))
 
     #Apply natural breaks to income layer
     lyr.symbology.valueField = "INCOME"
@@ -77,7 +77,7 @@ def select():
     arcpy.CalculateField_management(lyr,"RANK","!INCRANK! + !POPRANK!","PYTHON")
 
     #Apply unique symbol symbology from pre-defined symbologyLayer
-    RankSymLayer="C:\Users\zwhitman\Documents\census\psu_app\input\RankSymbology.lyr"
+    RankSymLayer="C:\Users\sflecher\Documents\Projects\CENSUS\PSU_App\RankSymbology.lyr"
     arcpy.ApplySymbologyFromLayer_management(lyr, RankSymLayer)
 
 
@@ -90,7 +90,7 @@ class SampleApp(tk.Tk):
         SampleApp.wm_title(self, "PSU Creator")
         #SampleApp.iconbitmap(self, bitmap="favicon.ico")
         SampleApp.iconbitmap(self,
-                             bitmap="C:\\Users\\zwhitman\\Documents\\census\\psu_app\\app_files\\psu_app\\favicon.ico")
+                             bitmap="C:\\Users\\sflecher\\Documents\\Projects\\CENSUS\\PSU_App\\psu_app_clean-master\\psu_app_clean-master\\favicon.ico")
         # the container is where we'll stack a bunch of frames
         # on top of each other, then the one we want visible
         # will be raised above the others
@@ -183,7 +183,7 @@ class PageOne(tk.Frame):
             inputpath = str(foldername+'/input/')
             outputpath = str(foldername+'/output/')
             tmppath = str(foldername+'/tmp/')
-            start_county_layer = "C:\Users\zwhitman\Documents\census\psu_app\input\us_counties_joined_3857.shp"
+            start_county_layer = "C:\Users\sflecher\Documents\Projects\CENSUS\PSU_App\us_counties_joined_3857.shp"
             input_county = inputpath+'us_counties_joined_3857.shp'
             arcpy.Copy_management(start_county_layer, input_county)
             #addLayer = arcpy.mapping.Layer(r""+input_county)
@@ -351,35 +351,44 @@ class PageTwo(tk.Frame):
             save_name = desc.FIDSet
             save_name2 = save_name.replace("; ", "_")
             arcpy.Dissolve_management(layer1, tmppath + "psu_" + save_name2,
-                                      "#", "WTDINCOME SUM;POP SUM;ALANDSQM SUM;INCOME SUM", "MULTI_PART", "DISSOLVE_LINES")
+                                      "#", "WTDINCOME SUM;POP SUM;ALANDSQM SUM;POPULATION SUM", "MULTI_PART", "DISSOLVE_LINES")
             lyr = arcpy.mapping.ListLayers(mxd, "", df)[0]
             layer2 = arcpy.mapping.ListLayers(mxd, "", df)[0].name
             #symbologyLayer = "C:\Users\zwhitman\Documents\census\psu_app\input\NaturalBreaksSym.lyr"
 
             #Add and calculate population & weighted income
-            arcpy.AddField_management(layer2, "POPULATION", "DOUBLE", "", "", "", "", "NULLABLE", "", "")
-            arcpy.CalculateField_management(layer2, "POPULATION", "!SUM_POP!/ !SUM_ALANDS!", "PYTHON")
-            arcpy.AddField_management(layer2, "WTDINCOME", "DOUBLE", "", "", "", "", "NULLABLE", "", "")
-            arcpy.CalculateField_management(layer2, "WTDINCOME", "!SUM_WTDINC! / !SUM_POP!", "PYTHON")
+            arcpy.AddField_management(layer2, "NEW_POP", "DOUBLE", "", "", "", "", "NULLABLE", "", "")
+            arcpy.CalculateField_management(layer2, "NEW_POP", "!SUM_POPULA!/ !SUM_ALANDS!", "PYTHON")
+            arcpy.AddField_management(layer2, "INCOME", "DOUBLE", "", "", "", "", "NULLABLE", "", "")
+            arcpy.CalculateField_management(layer2, "INCOME", "!SUM_WTDINC! / !SUM_POP!", "PYTHON")
 
             #Add pop rank field and calculate based on break points
             arcpy.AddField_management(lyr, "POPRANK", "TEXT", "", "", "1", "", "NULLABLE", "", "")
 
             calcstate1 = str("def calc(pop):\\n if pop >= %f:\\n  return 'A'\\n else:\\n  if pop >= %f:\\n   return 'B'\\n  elif pop >= %f:\\n   return 'C'\\n  else:\\n   return 'O'")
-            arcpy.CalculateField_management(lyr, "POPRANK", "calc(!POPULATION!)", "PYTHON", calcstate1 % (breakpt3pop, breakpt2pop, breakpt1pop))
+            arcpy.CalculateField_management(lyr, "POPRANK", "calc(!NEW_POP!)", "PYTHON", calcstate1 % (breakpt3pop, breakpt2pop, breakpt1pop))
 
             #Add income rank field and calculate based on break points
             arcpy.AddField_management(lyr,"INCRANK", "TEXT", "", "", "1", "", "NULLABLE", "", "")
             calcstate2 = str("def calc(pop):\\n if pop >= %f:\\n  return 'C'\\n else:\\n  if pop >= %f:\\n   return 'B'\\n  elif pop >= %f:\\n   return 'A'\\n  else:\\n   return 'O'")
-            arcpy.CalculateField_management(lyr, "INCRANK", "calc(!WTDINCOME!)", "PYTHON", calcstate2 % (breakpt3inc, breakpt2inc, breakpt1inc))
+            arcpy.CalculateField_management(lyr, "INCRANK", "calc(!INCOME!)", "PYTHON", calcstate2 % (breakpt3inc, breakpt2inc, breakpt1inc))
 
             #Add combined rank field and calculate concatenation
             arcpy.AddField_management(lyr,"RANK","TEXT","","","2","","NULLABLE","","")
             arcpy.CalculateField_management(lyr,"RANK","!INCRANK! + !POPRANK!","PYTHON")
 
             #Apply unique symbol symbology from pre-defined symbologyLayer
-            RankSymLayer="C:\Users\zwhitman\Documents\census\psu_app\input\RankSymbology.lyr"
+            RankSymLayer="C:\Users\sflecher\Documents\Projects\CENSUS\PSU_App\RankSymbology.lyr"
             arcpy.ApplySymbologyFromLayer_management(lyr, RankSymLayer)
+
+            #Color labels if breaks rules
+            expression="""Function FindLabel([SUM_POPULA],[SUM_ALANDS]):\n  if (cLng([SUM_POPULA]) <= 7500 OR cLng([SUM_ALANDS]) >= 3000) then\n   FindLabel= "<CLR red='255'><FNT size = '14'>" + [SUM_ALANDS] + "</FNT></CLR>"\n  else\n   FindLabel = [SUM_ALANDS]\n  end if\nEnd Function"""
+            lyr.labelClasses[0].expression=expression
+            for lblClass in lyr.labelClasses:
+              lblClass.showClassLabels=True
+            lyr.showLabels=True
+            arcpy.RefreshActiveView()
+
             return
 
 
