@@ -45,8 +45,8 @@ arcpy.TableToTable_conversion(inTable, outLocation, outTable, expression)
 #                               PSU,-1,-1""","#")
 arcpy.JoinField_management("C:/Users/zwhitman/Documents/census/psu_app/input/us_counties.shp",
                            "GEOID",
-                               "C:/Users/zwhitman/Documents/census/psu_app/input/input_test/xls_table2table.dbf",
-                               "GEOID","#")
+                           "C:/Users/zwhitman/Documents/census/psu_app/input/input_test/xls_table2table.dbf",
+                           "GEOID","#")
 
 
 # Select a specific state
