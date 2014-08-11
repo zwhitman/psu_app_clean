@@ -1,5 +1,6 @@
 __author__ = 'zwhitman'
 __author__ = 'sflecher'
+__author__ = 'jlam'
 
 import Tkinter as tk
 import tkFileDialog as fd
