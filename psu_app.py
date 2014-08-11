@@ -14,41 +14,6 @@ mxd = arcpy.mapping.MapDocument(r"CURRENT")
 global df
 df = arcpy.mapping.ListDataFrames(mxd, "Layers")[0]
 
-expression = arcpy.AddFieldDelimiters("C:/Users/zwhitman/Documents/census/psu_app/input/", "dummy_us_counties_PSU.xlsx/Sheet1$") + " = 'xls_arcpy_test'"
-inTable = "C:/Users/zwhitman/Documents/census/psu_app/input/dummy_us_counties_PSU.xlsx/Sheet1$"
-outLocation = "C:/Users/zwhitman/Documents/census/psu_app/input/input_test"
-outTable = "xls_table2table.dbf"
-
-arcpy.TableToTable_conversion(inTable, outLocation, outTable, expression)
-# arcpy.TableToTable_conversion("C:/Users/zwhitman/Documents/census/psu_app/input/dummy_us_counties_PSU.xlsx/Sheet1$",
-#                               "C:/Users/zwhitman/Documents/census/psu_app/input/input_test",
-#                               "xls_table2table.dbf","#","""STATEFP "STATEFP" true true false 255 Text 0 0 ,First,#,
-#                               C:/Users/zwhitman/Documents/census/psu_app/input/dummy_us_counties_PSU.xlsx/Sheet1$,
-#                               STATEFP,-1,-1;COUNTYFP "COUNTYFP" true true false 255 Text 0 0 ,First,#,
-#                               C:/Users/zwhitman/Documents/census/psu_app/input/dummy_us_counties_PSU.xlsx/Sheet1$,
-#                               COUNTYFP,-1,-1;GEOID "GEOID" true true false 255 Text 0 0 ,First,#,
-#                               C:/Users/zwhitman/Documents/census/psu_app/input/dummy_us_counties_PSU.xlsx/Sheet1$,
-#                               GEOID,-1,-1;NAME "NAME" true true false 255 Text 0 0 ,First,#,
-#                               C:/Users/zwhitman/Documents/census/psu_app/input/dummy_us_counties_PSU.xlsx/Sheet1$,
-#                               NAME,-1,-1;ALAND "ALAND" true true false 8 Double 6 15 ,First,#,
-#                               C:/Users/zwhitman/Documents/census/psu_app/input/dummy_us_counties_PSU.xlsx/Sheet1$,
-#                               ALAND,-1,-1;AWATER "AWATER" true true false 8 Double 6 15 ,First,#,
-#                               C:/Users/zwhitman/Documents/census/psu_app/input/dummy_us_counties_PSU.xlsx/Sheet1$,
-#                               AWATER,-1,-1;ALANDSQM "ALANDSQM" true true false 8 Double 6 15 ,First,#,
-#                               C:/Users/zwhitman/Documents/census/psu_app/input/dummy_us_counties_PSU.xlsx/Sheet1$,
-#                               ALANDSQM,-1,-1;POP "POP" true true false 8 Double 6 15 ,First,#,
-#                               C:/Users/zwhitman/Documents/census/psu_app/input/dummy_us_counties_PSU.xlsx/Sheet1$,
-#                               POP,-1,-1;INCOME "INCOME" true true false 8 Double 6 15 ,First,#,
-#                               C:/Users/zwhitman/Documents/census/psu_app/input/dummy_us_counties_PSU.xlsx/Sheet1$,
-#                               INCOME,-1,-1;PSU "PSU" true true false 8 Double 6 15 ,First,#,
-#                               C:/Users/zwhitman/Documents/census/psu_app/input/dummy_us_counties_PSU.xlsx/Sheet1$,
-#                               PSU,-1,-1""","#")
-arcpy.JoinField_management("C:/Users/zwhitman/Documents/census/psu_app/input/us_counties.shp",
-                           "GEOID",
-                           "C:/Users/zwhitman/Documents/census/psu_app/input/input_test/xls_table2table.dbf",
-                           "GEOID","#")
-
-
 # Select a specific state
 def select():
     items = map(int, listbox.curselection())
