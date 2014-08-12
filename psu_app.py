@@ -15,76 +15,8 @@ global df
 df = arcpy.mapping.ListDataFrames(mxd, "Layers")[0]
 
 
-def delete():
-    #do something
-    return
 
 
-# Select a specific state
-def select():
-    items = map(int, listbox.curselection())
-    itemchoice = items[0]
-    statechoice = str(statefips[itemchoice])
-    state_select = "STATEFP = '"+statechoice+"'"
-    name1 = tmppath+"01_state_test"+re.sub('-', '_', str(uuid.uuid4()))+".shp"
-    name2 = "us_counties_joined_3857"
-    arcpy.Select_analysis(name2, name1, state_select)
-    global layer1
-    layer1 = arcpy.mapping.ListLayers(mxd, "", df)[0].name
-    lyr = arcpy.mapping.ListLayers(mxd, "", df)[0]
-    df.extent = lyr.getExtent()
-    countylyr = arcpy.mapping.ListLayers(mxd, "", df)[1]
-    arcpy.mapping.RemoveLayer(df, countylyr)
-    #Add and calculate population & weighted income
-    arcpy.AddField_management(layer1, "POPULATION", "DOUBLE", "", "", "", "", "NULLABLE", "", "")
-    arcpy.CalculateField_management(layer1, "POPULATION", "!POP!*!ALANDSQM!", "PYTHON")
-    arcpy.AddField_management(layer1, "WTDINCOME", "DOUBLE", "", "", "", "", "NULLABLE", "", "")
-    arcpy.CalculateField_management(layer1, "WTDINCOME", "!INCOME!*!POP!", "PYTHON")
-
-    #Apply natural breaks from pre-defined symbologyLayer
-    symbologyLayer = "C:\Users\sflecher\Documents\Projects\CENSUS\PSU_App\NaturalBreaksSym.lyr"
-    arcpy.ApplySymbologyFromLayer_management(layer1, symbologyLayer)
-
-    #Create variables from break points
-    global breakpt1pop
-    global breakpt2pop
-    global breakpt3pop
-    breakpt1pop = lyr.symbology.classBreakValues[0]
-    breakpt2pop = lyr.symbology.classBreakValues[1]
-    breakpt3pop = lyr.symbology.classBreakValues[2]
-
-
-    #Add pop rank field and calculate based on break points
-    arcpy.AddField_management(lyr, "POPRANK", "TEXT", "", "", "1", "", "NULLABLE", "", "")
-
-    calcstate1 = str("def calc(pop):\\n if pop >= %f:\\n  return 'A'\\n else:\\n  if pop >= %f:\\n   return 'B'\\n  elif pop >= %f:\\n   return 'C'\\n  else:\\n   return 'O'")
-    arcpy.CalculateField_management(lyr, "POPRANK", "calc(!POP!)", "PYTHON", calcstate1 % (breakpt3pop, breakpt2pop, breakpt1pop))
-
-    #Apply natural breaks to income layer
-    lyr.symbology.valueField = "INCOME"
-    lyr.symbology.numClasses = 3
-
-    #Create variables from break points
-    global breakpt1inc
-    global breakpt2inc
-    global breakpt3inc
-    breakpt1inc = lyr.symbology.classBreakValues[0]
-    breakpt2inc = lyr.symbology.classBreakValues[1]
-    breakpt3inc = lyr.symbology.classBreakValues[2]
-
-
-    #Add income rank field and calculate based on break points
-    arcpy.AddField_management(lyr,"INCRANK", "TEXT", "", "", "1", "", "NULLABLE", "", "")
-    calcstate2 = str("def calc(pop):\\n if pop >= %f:\\n  return 'C'\\n else:\\n  if pop >= %f:\\n   return 'B'\\n  elif pop >= %f:\\n   return 'A'\\n  else:\\n   return 'O'")
-    arcpy.CalculateField_management(lyr, "INCRANK", "calc(!INCOME!)", "PYTHON", calcstate2 % (breakpt3inc, breakpt2inc, breakpt1inc))
-
-    #Add combined rank field and calculate concatenation
-    arcpy.AddField_management(lyr,"RANK","TEXT","","","2","","NULLABLE","","")
-    arcpy.CalculateField_management(lyr,"RANK","!INCRANK! + !POPRANK!","PYTHON")
-
-    #Apply unique symbol symbology from pre-defined symbologyLayer
-    RankSymLayer="C:\Users\sflecher\Documents\Projects\CENSUS\PSU_App\RankSymbology.lyr"
-    arcpy.ApplySymbologyFromLayer_management(lyr, RankSymLayer)
 
 
 TITLE_FONT = ("Helvetica", 18, "bold")
@@ -94,9 +26,8 @@ class SampleApp(tk.Tk):
     def __init__(self, *args, **kwargs):
         tk.Tk.__init__(self, *args, **kwargs)
         SampleApp.wm_title(self, "PSU Creator")
-        #SampleApp.iconbitmap(self, bitmap="favicon.ico")
         SampleApp.iconbitmap(self,
-                             bitmap="C:\\Users\\sflecher\\Documents\\Projects\\CENSUS\\PSU_App\\psu_app_clean-master\\psu_app_clean-master\\favicon.ico")
+                             bitmap="C:\\Users\\zwhitman\\Documents\\census\\psu_app_clean2\\favicon.ico")
         # the container is where we'll stack a bunch of frames
         # on top of each other, then the one we want visible
         # will be raised above the others
@@ -121,20 +52,6 @@ class SampleApp(tk.Tk):
         frame = self.frames[c]
         frame.tkraise()
 
-    def find_loc_directory(self):
-        global path_directory
-        path_directory = str(fd.askdirectory())
-        path_directory = str(path_directory)
-        global foldername
-        global inputpath
-        global outputpath
-        global tmppath
-        foldername = path_directory.rsplit('\\', 1)[0]
-        inputpath = str(foldername+'/input/')
-        outputpath = str(foldername+'/output/')
-        tmppath = str(foldername+'/tmp/')
-        mtext = path_directory
-        mlabel = tk.Label(self, text=mtext).pack()
 
 class StartPage(tk.Frame):
     def __init__(self, parent, controller):
@@ -148,38 +65,35 @@ class StartPage(tk.Frame):
                            font=("Helvetica", 16))
         welcome.pack(side="top", fill="x", pady=10)
 
-        button1 = tk.Button(self, text="Continue",
+        button1 = tk.Button(self, text="Start", height=2, width=10, font="Helvetica",
                             command=lambda: controller.show_frame(PageOne))
-        button1.pack()
+        #button1.place(relx=.867, rely=.892)
+        button1.pack(side="bottom", pady=40)
 
 
 class PageOne(tk.Frame):
     def __init__(self, parent, controller):
         tk.Frame.__init__(self, parent)
+        tk.Frame.columnconfigure(self, 1, weight=3)
+        tk.Frame.columnconfigure(self, 2, weight=3)
+        tk.Frame.columnconfigure(self, 3, weight=3)
         label = tk.Label(self, text="Where would you like to save everything?", font=TITLE_FONT)
-        label.pack(side="top", fill="x", pady=10)
+        label.grid(column=1, row=1, columnspan=5, sticky="nsew")
 
 
-        buttonFileBrowse = tk.Button(self, text="Browse",
-                                     command=lambda: controller.find_loc_directory())
-        #command=lambda: fd.askdirectory())
-
-
-        filename_label = tk.Label(self, text="Name of Folder", font=("Helvetica", 9))
-
-        input_filename = tk.StringVar()
-        #filename_entry = tk.Entry(self, controller.input_filename(), bd=5)
-
-        button = tk.Button(self, text="Go back",
-                           command=lambda: controller.show_frame(StartPage))
-        button2 = tk.Button(self, text="Continue",
-                            command=lambda: controller.show_frame(PageState))
-
-        buttonFileBrowse.pack(side="top")
-        filename_label.pack(side="top")
-        #filename_entry.pack(side="top")
-        button.pack(side="left")
-        button2.pack(side="right")
+        def find_loc_directory():
+            global path_directory
+            path_directory = fd.askdirectory()
+            global foldername
+            global inputpath
+            global outputpath
+            global tmppath
+            foldername = path_directory.rsplit('\\', 1)[0]
+            inputpath = str(foldername+'/input/')
+            outputpath = str(foldername+'/output/')
+            tmppath = str(foldername+'/tmp/')
+            mlabel['text'] = path_directory
+            return
 
         def mhello():
             foldername = path_directory.rsplit('\\', 1)[0]
@@ -189,17 +103,41 @@ class PageOne(tk.Frame):
             inputpath = str(foldername+'/input/')
             outputpath = str(foldername+'/output/')
             tmppath = str(foldername+'/tmp/')
-            start_county_layer = "C:\Users\sflecher\Documents\Projects\CENSUS\PSU_App\us_counties_joined_3857.shp"
+            start_county_layer = "C:\Users\zwhitman\Documents\census\psu_app\input\us_counties_joined_3857.shp"
             input_county = inputpath+'us_counties_joined_3857.shp'
             arcpy.Copy_management(start_county_layer, input_county)
-            #addLayer = arcpy.mapping.Layer(r""+input_county)
-            arcpy.mapping.AddLayer(df, addLayer, "BOTTOM")
+            button2['state'] = 'normal'
             return
 
-        mlabel = tk.Label(self, text="Does this look right")
-        mlabel.pack(side="top")
-        mbutton = tk.Button(self, text="Ok", command=mhello)
-        mbutton.pack(side="top")
+        def filepath():
+            global variable_file
+            variable_file = fd.askopenfilename()
+            flabel['text'] = variable_file
+            return
+
+        buttonFileBrowse = tk.Button(self, text="Folder Path", height=2, font="Helvetica",
+                                     command=lambda: find_loc_directory())
+
+
+        button = tk.Button(self, text="Go back", font="Helvetica", height=2,
+                           command=lambda: controller.show_frame(StartPage))
+        button2 = tk.Button(self, text="Continue", state='disabled', font="Helvetica", height=2,
+                            command=lambda: controller.show_frame(PageState))
+
+        buttonFileBrowse.grid(column=1, row=2, pady=10, padx=(20, 10), sticky="nsew")
+        button.place(relx=0, rely=1, anchor='sw')
+        button2.place(relx=1, rely=1, anchor='se')
+
+
+        mlabel = tk.Label(self, text="", font="Helvetica")
+        flabel = tk.Label(self, text="", font="Helvetica")
+        filebutton = tk.Button(self, text="Variable File", height=2, font="Helvetica", command=lambda: filepath())
+        mbutton = tk.Button(self, text="Ok", height=2, width=30, font="Helvetica", command=mhello)
+
+        filebutton.grid(column=1, row=3, pady=10, padx=(20, 10), sticky="nsew")
+        mlabel.grid(column=2, row=2, columnspan=3, sticky='w')
+        flabel.grid(column=2, row=3, columnspan=3, sticky='w')
+        mbutton.grid(column=1, row=4, columnspan=5, sticky="nsew", padx=180, pady=20)
 
 
 class PageState(tk.Frame):
@@ -208,14 +146,84 @@ class PageState(tk.Frame):
         label = tk.Label(self, text="What state would you like to work on?", font=TITLE_FONT)
         label.pack(side="top", fill="x", pady=10)
 
-        button_choosestate = tk.Button(self, text="Choose your State",
+        button_choosestate = tk.Button(self, text="Choose your State", font="Helvetica", height=2,
                                        command=lambda: select())
+
+        # Select a specific state
+        def select():
+            items = map(int, listbox.curselection())
+            itemchoice = items[0]
+            statechoice = str(statefips[itemchoice])
+            state_select = "STATEFP = '"+statechoice+"'"
+            name1 = tmppath+"01_state_test"+re.sub('-', '_', str(uuid.uuid4()))+".shp"
+            name2 = "us_counties_joined_3857"
+            arcpy.Select_analysis(name2, name1, state_select)
+            global layer1
+            layer1 = arcpy.mapping.ListLayers(mxd, "", df)[0].name
+            lyr = arcpy.mapping.ListLayers(mxd, "", df)[0]
+            df.extent = lyr.getExtent()
+            countylyr = arcpy.mapping.ListLayers(mxd, "", df)[1]
+            arcpy.mapping.RemoveLayer(df, countylyr)
+            #Add and calculate population & weighted income
+            arcpy.AddField_management(layer1, "POPULATION", "DOUBLE", "", "", "", "", "NULLABLE", "", "")
+            arcpy.CalculateField_management(layer1, "POPULATION", "!POP!*!ALANDSQM!", "PYTHON")
+            arcpy.AddField_management(layer1, "WTDINCOME", "DOUBLE", "", "", "", "", "NULLABLE", "", "")
+            arcpy.CalculateField_management(layer1, "WTDINCOME", "!INCOME!*!POP!", "PYTHON")
+
+            #Apply natural breaks from pre-defined symbologyLayer
+            symbologyLayer = "C:\Users\zwhitman\Documents\census\psu_app\input\NaturalBreaksSym.lyr"
+            arcpy.ApplySymbologyFromLayer_management(layer1, symbologyLayer)
+
+            #Create variables from break points
+            global breakpt1pop
+            global breakpt2pop
+            global breakpt3pop
+            breakpt1pop = lyr.symbology.classBreakValues[0]
+            breakpt2pop = lyr.symbology.classBreakValues[1]
+            breakpt3pop = lyr.symbology.classBreakValues[2]
+
+
+            #Add pop rank field and calculate based on break points
+            arcpy.AddField_management(lyr, "POPRANK", "TEXT", "", "", "1", "", "NULLABLE", "", "")
+
+            calcstate1 = str("def calc(pop):\\n if pop >= %f:\\n  return 'A'\\n else:\\n  if pop >= %f:\\n   return 'B'\\n  elif pop >= %f:\\n   return 'C'\\n  else:\\n   return 'O'")
+            arcpy.CalculateField_management(lyr, "POPRANK", "calc(!POP!)", "PYTHON", calcstate1 % (breakpt3pop, breakpt2pop, breakpt1pop))
+
+            #Apply natural breaks to income layer
+            lyr.symbology.valueField = "INCOME"
+            lyr.symbology.numClasses = 3
+
+            #Create variables from break points
+            global breakpt1inc
+            global breakpt2inc
+            global breakpt3inc
+            breakpt1inc = lyr.symbology.classBreakValues[0]
+            breakpt2inc = lyr.symbology.classBreakValues[1]
+            breakpt3inc = lyr.symbology.classBreakValues[2]
+
+
+            #Add income rank field and calculate based on break points
+            arcpy.AddField_management(lyr,"INCRANK", "TEXT", "", "", "1", "", "NULLABLE", "", "")
+            calcstate2 = str("def calc(pop):\\n if pop >= %f:\\n  return 'C'\\n else:\\n  if pop >= %f:\\n   return 'B'\\n  elif pop >= %f:\\n   return 'A'\\n  else:\\n   return 'O'")
+            arcpy.CalculateField_management(lyr, "INCRANK", "calc(!INCOME!)", "PYTHON", calcstate2 % (breakpt3inc, breakpt2inc, breakpt1inc))
+
+            #Add combined rank field and calculate concatenation
+            arcpy.AddField_management(lyr,"RANK","TEXT","","","2","","NULLABLE","","")
+            arcpy.CalculateField_management(lyr,"RANK","!INCRANK! + !POPRANK!","PYTHON")
+
+            #Apply unique symbol symbology from pre-defined symbologyLayer
+            RankSymLayer="C:\Users\zwhitman\Documents\census\psu_app\input\RankSymbology.lyr"
+            arcpy.ApplySymbologyFromLayer_management(lyr, RankSymLayer)
+
+            # enable continue button
+            button2['state'] = 'normal'
+
 
         pagestateframe = tk.Frame(self)
         pagestateframe.pack(side="top", fill="both", padx=5, pady=5)
         scroll = tk.Scrollbar(pagestateframe, bd=0)
         global listbox
-        listbox = tk.Listbox(pagestateframe, bd=0, yscrollcommand=scroll.set)
+        listbox = tk.Listbox(pagestateframe, bd=0, font="Helvetica", yscrollcommand=scroll.set)
 
         scroll.pack(side="right", fill="y")
         listbox.pack(side="top", fill="both")
@@ -331,14 +339,14 @@ class PageState(tk.Frame):
                      "56"]
 
 
-        button = tk.Button(self, text="Go back",
+        button = tk.Button(self, text="Go back", font="Helvetica", height=2,
                            command=lambda: controller.show_frame(PageOne))
-        button2 = tk.Button(self, text="Continue",
+        button2 = tk.Button(self, text="Continue", state='disabled', font="Helvetica", height=2,
                             command=lambda: controller.show_frame(PageTwo))
 
         button_choosestate.pack(side="top")
-        button.pack(side="left")
-        button2.pack(side="right")
+        button.place(relx=0, rely=1, anchor='sw')
+        button2.place(relx=1, rely=1, anchor='se')
 
 
 class PageTwo(tk.Frame):
@@ -346,9 +354,9 @@ class PageTwo(tk.Frame):
         tk.Frame.__init__(self, parent)
         label = tk.Label(self, text="Let's Get Down to Business", font=TITLE_FONT)
         label.pack(side="top", fill="x", pady=10)
-        button3 = tk.Button(self, text="Continue",
+        button3 = tk.Button(self, text="Continue", font="Helvetica", height=2,
                             command=lambda: controller.show_frame(PageThree))
-        button1 = tk.Button(self, text="Go back",
+        button1 = tk.Button(self, text="Go back", font="Helvetica", height=2,
                             command=lambda: controller.show_frame(PageState))
 
 
@@ -384,7 +392,7 @@ class PageTwo(tk.Frame):
             arcpy.CalculateField_management(lyr,"RANK","!INCRANK! + !POPRANK!","PYTHON")
 
             #Apply unique symbol symbology from pre-defined symbologyLayer
-            RankSymLayer="C:\Users\sflecher\Documents\Projects\CENSUS\PSU_App\RankSymbology.lyr"
+            RankSymLayer="C:\Users\zwhitman\Documents\census\psu_app\input\RankSymbology.lyr"
             arcpy.ApplySymbologyFromLayer_management(lyr, RankSymLayer)
 
             #Color labels if breaks rules
@@ -397,25 +405,47 @@ class PageTwo(tk.Frame):
 
             return
 
+        def delete():
+            #do something
+            print "DELETED! AGH..."
+            return
 
-        dissolve_button = tk.Button(self, text="Create PSU",
+        dissolve_button = tk.Button(self, text="Create PSU", font="Helvetica", height=2,
                                     command=lambda: dissolve_button_func())
 
-        dissolve_button.pack(side="top")
-        button3.pack(side="right")
-        button1.pack(side="left")
+        delete_button = tk.Button(self, text="Delete PSU", font="Helvetica", height=2,
+                                    command=lambda: delete())
 
+        dissolve_button.pack(side="top")
+        delete_button.pack(side="top")
+
+        button1.place(relx=0, rely=1, anchor='sw')
+        button3.place(relx=1, rely=1, anchor='se')
 
 class PageThree(tk.Frame):
     def __init__(self, parent, controller):
         tk.Frame.__init__(self, parent)
         label = tk.Label(self, text="Let's Export This Thing", font=TITLE_FONT)
         label.pack(side="top", fill="x", pady=10)
-        button2 = tk.Button(self, text="Go back",
-                            command=lambda: controller.show_frame(PageTwo))
-        button2.pack(side="left")
 
+        def export_button_func():
+            # do something
+            print "Exported! Agh..."
+            return
+
+
+        export_button = tk.Button(self, text="Export", font="Helvetica", height=2,
+                                  command=lambda: export_button_func())
+
+
+        export_button.pack(side="top")
+
+        button2 = tk.Button(self, text="Go back", font="Helvetica", height=2,
+                            command=lambda: controller.show_frame(PageTwo))
+
+        button2.place(relx=0, rely=1, anchor='sw')
 
 if __name__ == "__main__":
     app = SampleApp()
+    app.minsize(width=500, height=300)
     app.mainloop()
