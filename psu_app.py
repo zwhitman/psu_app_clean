@@ -170,13 +170,22 @@ class PageState(tk.Frame):
             for x in arcpy.mapping.ListLayers(mxd, "", df):
                 arcpy.mapping.RemoveLayer(df, x)
             items = map(int, listbox.curselection())
+            # create state temp folder
+            global tmp_state_folder
+            tmp_state_folder = statename+"_"+re.sub('-', '_', str(uuid.uuid4()))
+            global fullpath_tmp_state_folder
+            fullpath_tmp_state_folder = tmppath+tmp_state_folder+"/"
+            print fullpath_tmp_state_folder
+            arcpy.CreateFolder_management(tmppath, tmp_state_folder)
             itemchoice = items[0]
             statechoice = str(statefips[itemchoice])
             state_select = "STATEFP = '"+statechoice+"'"
             global name1
             name1 = statelist[itemchoice]+"_"+re.sub('-', '_', str(uuid.uuid4()))
+            global statename
+            statename = statelist[itemchoice]
             global name3
-            name3 = tmppath+name1+".shp"
+            name3 = fullpath_tmp_state_folder+name1+".shp"
             name2 = "us_counties_joined_3857"
             arcpy.Select_analysis(input_county, name3, state_select)
             global layer1
@@ -239,6 +248,7 @@ class PageState(tk.Frame):
             # enable continue button
             button2['state'] = 'normal'
             controller.show_frame(PageTwo)
+
 
 
         pagestateframe = tk.Frame(self)
@@ -390,7 +400,7 @@ class PageTwo(tk.Frame):
             desc = arcpy.Describe(layer1)
             save_name = desc.FIDSet
             save_name2 = save_name.replace("; ", "_")
-            arcpy.Dissolve_management(layer1, tmppath + "psu_" + save_name2,
+            arcpy.Dissolve_management(layer1, fullpath_tmp_state_folder + "psu_" + save_name2,
                                       "#", "WTDINCOME SUM;POP SUM;ALANDSQM SUM;POPULATION SUM", "MULTI_PART", "DISSOLVE_LINES")
             lyr = arcpy.mapping.ListLayers(mxd, "", df)[0]
             layer2 = arcpy.mapping.ListLayers(mxd, "", df)[0].name
@@ -432,7 +442,7 @@ class PageTwo(tk.Frame):
             return
 
         def delete():
-            arcpy.Delete_management(tmppath+arcpy.mapping.ListLayers(mxd, "", df)[0].name+".shp", "#")
+            arcpy.Delete_management(fullpath_tmp_state_folder+arcpy.mapping.ListLayers(mxd, "psu*", df)[0].name+".shp", "#")
             return
 
         dissolve_button = tk.Button(dissolve_del_frame, text="Create PSU", font="Helvetica", height=2, width=20,
@@ -477,19 +487,25 @@ class PageThree(tk.Frame):
 
         def export_button_func():
             #merge PSUs
-            arcpy.env.workspace = tmppath
+            arcpy.CreateFolder_management(outputpath, tmp_state_folder)
+            arcpy.env.workspace = fullpath_tmp_state_folder
             fcList = arcpy.ListFeatureClasses("*psu*", "polygon", "")
-            arcpy.Merge_management(fcList, "PSUmerge.shp")
+            tem_merge_file_no_shp = "PSUmerge_"+statename+"_"+re.sub('-', '_', str(uuid.uuid4()))
+            tem_merge_file = tem_merge_file_no_shp+".shp"
+            out_merge_file_no_shp = "allMerge_"+statename+"_"+re.sub('-', '_', str(uuid.uuid4()))
+            out_merge_file = out_merge_file_no_shp+".shp"
+            arcpy.Merge_management(fcList, tem_merge_file)
 
             #Select counties that overlap PSUs and inverse selection
-            arcpy.SelectLayerByLocation_management(name1, "WITHIN", "PSUmerge", "", "NEW_SELECTION")
-            arcpy.SelectLayerByLocation_management(name1, "WITHIN", "PSUmerge", "", "SWITCH_SELECTION")
+            arcpy.SelectLayerByLocation_management(name1, "WITHIN", tem_merge_file_no_shp, "", "NEW_SELECTION")
+            arcpy.SelectLayerByLocation_management(name1, "WITHIN", tem_merge_file_no_shp, "", "SWITCH_SELECTION")
 
             #Merge PSUs with Counties
-            arcpy.Merge_management([name1, "PSUmerge"], outputpath+"allMerge.shp")
-            arcpy.SelectLayerByAttribute_management("allMerge", "NEW_SELECTION", """"POPULATION"=0""")
-            arcpy.CalculateField_management("allMerge", "POPULATION", "!SUM_POPULA!", "PYTHON")
-            arcpy.CalculateField_management("allMerge", "ALANDSQM", "!SUM_ALANDS!", "PYTHON")
+            state_output_path = outputpath+tmp_state_folder+'/'
+            arcpy.Merge_management([name1, tem_merge_file_no_shp], state_output_path+out_merge_file)
+            arcpy.SelectLayerByAttribute_management(out_merge_file_no_shp, "NEW_SELECTION", """"POPULATION"=0""")
+            arcpy.CalculateField_management(out_merge_file_no_shp, "POPULATION", "!SUM_POPULA!", "PYTHON")
+            arcpy.CalculateField_management(out_merge_file_no_shp, "ALANDSQM", "!SUM_ALANDS!", "PYTHON")
 
             #Exporting shapefile to csv (and ignoring umlaut character)
             u = unichr(253)
@@ -500,11 +516,11 @@ class PageThree(tk.Frame):
             print "3"
             gp=arcgisscripting.create(10.2)
             print "4"
-            output=open(r""+outputpath+"tableOutput.csv","w")
+            output=open(r""+state_output_path+"tableOutput"+statename+"_"+re.sub('-', '_', str(uuid.uuid4()))+".csv","w")
             print "5"
             linewriter=csv.writer(output,delimiter=',')
             print "6"
-            fcdescribe=gp.Describe(r""+outputpath+"allMerge.shp")
+            fcdescribe=gp.Describe(r""+state_output_path+out_merge_file)
             print "7"
             flds=fcdescribe.Fields
             print "8"
@@ -514,7 +530,7 @@ class PageThree(tk.Frame):
                 value=fld.Name
                 header.append(value)
             linewriter.writerow(header)
-            cursor = gp.searchcursor(r""+outputpath+"allMerge.shp")
+            cursor = gp.searchcursor(r""+state_output_path+out_merge_file)
             row = cursor.Next()
             print "Export 2"
             while row:
@@ -528,7 +544,7 @@ class PageThree(tk.Frame):
 
             #Zoom to state layer extent
             #(statelyr variable set to state layer)
-            lyr = arcpy.mapping.ListLayers(mxd, "allMerge", df)[0]
+            lyr = arcpy.mapping.ListLayers(mxd, out_merge_file_no_shp, df)[0]
 
             RankSymLayer="C:\Users\zwhitman\Documents\census\psu_app\input\RankSymbology.lyr"
             arcpy.ApplySymbologyFromLayer_management(lyr, RankSymLayer)
@@ -553,7 +569,7 @@ class PageThree(tk.Frame):
             arcpy.SelectLayerByAttribute_management(name1,"CLEAR_SELECTION")
 
             #Export map to pdf
-            arcpy.mapping.ExportToJPEG(mxd, r""+outputpath+"mapOutput.jpg")
+            arcpy.mapping.ExportToJPEG(mxd, r""+state_output_path+"mapOutput.jpg")
 
             # do something
             return
@@ -582,4 +598,5 @@ class PageThree(tk.Frame):
 if __name__ == "__main__":
     app = SampleApp()
     app.minsize(width=500, height=300)
+    app.wm_attributes("-topmost", 1)
     app.mainloop()
