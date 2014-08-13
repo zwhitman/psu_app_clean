@@ -7,6 +7,7 @@ import tkFileDialog as fd
 import arcpy
 import uuid
 import re
+import os
 
 # Add us_counties and join
 global mxd
@@ -37,7 +38,7 @@ class SampleApp(tk.Tk):
         container.grid_columnconfigure(0, weight=1)
 
         self.frames = {}
-        for F in (StartPage, PageOne, PageState, PageTwo, PageThree):
+        for F in (StartPage, PageOne, PageState, PageTwo, PageWarning, PageThree):
             frame = F(container, self)
             self.frames[F] = frame
             # put all of the pages in the same location;
@@ -78,7 +79,7 @@ class PageOne(tk.Frame):
         tk.Frame.columnconfigure(self, 2, weight=3)
         tk.Frame.columnconfigure(self, 3, weight=3)
         label = tk.Label(self, text="Where would you like to save everything?", font=TITLE_FONT)
-        label.grid(column=1, row=1, columnspan=5, sticky="nsew")
+        label.grid(column=1, row=1, columnspan=5, pady=[10, 0], sticky="nsew")
 
 
         def find_loc_directory():
@@ -95,6 +96,12 @@ class PageOne(tk.Frame):
             mlabel['text'] = path_directory
             return
 
+        def filepath():
+            global variable_file
+            variable_file = fd.askopenfilename()
+            flabel['text'] = variable_file
+            return
+
         def mhello():
             foldername = path_directory.rsplit('\\', 1)[0]
             arcpy.CreateFolder_management(foldername, 'input')
@@ -103,17 +110,26 @@ class PageOne(tk.Frame):
             inputpath = str(foldername+'/input/')
             outputpath = str(foldername+'/output/')
             tmppath = str(foldername+'/tmp/')
-            start_county_layer = "C:\Users\zwhitman\Documents\census\psu_app\input\us_counties_joined_3857.shp"
+            start_county_layer = "C:\Users\zwhitman\Documents\census\psu_app\input\us_counties.shp"
+            global input_county
             input_county = inputpath+'us_counties_joined_3857.shp'
-            arcpy.Copy_management(start_county_layer, input_county)
-            button2['state'] = 'normal'
+            if os.path.isfile(input_county):
+                controller.show_frame(PageState)
+            else:
+                arcpy.Copy_management(start_county_layer, input_county)
+                button2['state'] = 'normal'
+                arcpy.TableToDBASE_conversion(variable_file, inputpath)
+                dbf_varfile = variable_file.rsplit('/', 1)[1]
+                dbf_varfile = dbf_varfile[:-3]+"dbf"
+                dbf_varfile = inputpath+dbf_varfile
+                print dbf_varfile
+                arcpy.AddField_management(dbf_varfile, "GEOID_2", "TEXT", "#", "#", "#", "#", "NULLABLE", "NON_REQUIRED", "#")
+                arcpy.CalculateField_management(dbf_varfile, "GEOID_2", "calc(!GEOID!)", "PYTHON_9.3", "def calc(a):\\n     x = a[1:-1] \\n     return x\\n")
+                arcpy.JoinField_management(input_county, "GEOID", dbf_varfile, "GEOID_2", "#")
+                controller.show_frame(PageState)
+
             return
 
-        def filepath():
-            global variable_file
-            variable_file = fd.askopenfilename()
-            flabel['text'] = variable_file
-            return
 
         buttonFileBrowse = tk.Button(self, text="Folder Path", height=2, font="Helvetica",
                                      command=lambda: find_loc_directory())
@@ -121,23 +137,23 @@ class PageOne(tk.Frame):
 
         button = tk.Button(self, text="Go back", font="Helvetica", height=2,
                            command=lambda: controller.show_frame(StartPage))
-        button2 = tk.Button(self, text="Continue", state='disabled', font="Helvetica", height=2,
-                            command=lambda: controller.show_frame(PageState))
+        button2 = tk.Button(self, text="Continue", state='normal', font="Helvetica", height=2,
+                            command=lambda: mhello())
 
         buttonFileBrowse.grid(column=1, row=2, pady=10, padx=(20, 10), sticky="nsew")
         button.place(relx=0, rely=1, anchor='sw')
         button2.place(relx=1, rely=1, anchor='se')
 
 
-        mlabel = tk.Label(self, text="", font="Helvetica")
-        flabel = tk.Label(self, text="", font="Helvetica")
+        mlabel = tk.Label(self, text="Browse to the folder where you'd like everything to be saved.", font="Helvetica")
+        flabel = tk.Label(self, text="Browse to the variable excel spreadsheet to be used to create PSUs.", font="Helvetica")
         filebutton = tk.Button(self, text="Variable File", height=2, font="Helvetica", command=lambda: filepath())
-        mbutton = tk.Button(self, text="Ok", height=2, width=30, font="Helvetica", command=mhello)
+        #mbutton = tk.Button(self, text="Ok", height=2, width=30, font="Helvetica", command=mhello)
 
         filebutton.grid(column=1, row=3, pady=10, padx=(20, 10), sticky="nsew")
         mlabel.grid(column=2, row=2, columnspan=3, sticky='w')
         flabel.grid(column=2, row=3, columnspan=3, sticky='w')
-        mbutton.grid(column=1, row=4, columnspan=5, sticky="nsew", padx=180, pady=20)
+        #mbutton.grid(column=1, row=4, columnspan=5, sticky="nsew", padx=180, pady=20)
 
 
 class PageState(tk.Frame):
@@ -146,24 +162,29 @@ class PageState(tk.Frame):
         label = tk.Label(self, text="What state would you like to work on?", font=TITLE_FONT)
         label.pack(side="top", fill="x", pady=10)
 
-        button_choosestate = tk.Button(self, text="Choose your State", font="Helvetica", height=2,
-                                       command=lambda: select())
+        #button_choosestate = tk.Button(self, text="Choose your State", font="Helvetica", height=2,
+        #                               command=lambda: select())
 
         # Select a specific state
         def select():
+            for x in arcpy.mapping.ListLayers(mxd, "", df):
+                arcpy.mapping.RemoveLayer(df, x)
             items = map(int, listbox.curselection())
             itemchoice = items[0]
             statechoice = str(statefips[itemchoice])
             state_select = "STATEFP = '"+statechoice+"'"
-            name1 = tmppath+"01_state_test"+re.sub('-', '_', str(uuid.uuid4()))+".shp"
+            global name1
+            name1 = statelist[itemchoice]+"_"+re.sub('-', '_', str(uuid.uuid4()))
+            global name3
+            name3 = tmppath+name1+".shp"
             name2 = "us_counties_joined_3857"
-            arcpy.Select_analysis(name2, name1, state_select)
+            arcpy.Select_analysis(input_county, name3, state_select)
             global layer1
             layer1 = arcpy.mapping.ListLayers(mxd, "", df)[0].name
             lyr = arcpy.mapping.ListLayers(mxd, "", df)[0]
             df.extent = lyr.getExtent()
-            countylyr = arcpy.mapping.ListLayers(mxd, "", df)[1]
-            arcpy.mapping.RemoveLayer(df, countylyr)
+            #countylyr = arcpy.mapping.ListLayers(mxd, "", df)[1]
+            #arcpy.mapping.RemoveLayer(df, countylyr)
             #Add and calculate population & weighted income
             arcpy.AddField_management(layer1, "POPULATION", "DOUBLE", "", "", "", "", "NULLABLE", "", "")
             arcpy.CalculateField_management(layer1, "POPULATION", "!POP!*!ALANDSQM!", "PYTHON")
@@ -217,6 +238,7 @@ class PageState(tk.Frame):
 
             # enable continue button
             button2['state'] = 'normal'
+            controller.show_frame(PageTwo)
 
 
         pagestateframe = tk.Frame(self)
@@ -231,7 +253,7 @@ class PageState(tk.Frame):
         scroll.config(command=listbox.yview)
         listbox.config(yscrollcommand=scroll.set)
 
-        for item in ["Alabama",
+        statelist = ["Alabama",
                      "Alaska",
                      "Arizona",
                      "Arkansas",
@@ -281,8 +303,9 @@ class PageState(tk.Frame):
                      "Washington",
                      "West Virginia",
                      "Wisconsin",
-                     "Wyoming"]:
+                     "Wyoming"]
 
+        for item in statelist:
             listbox.insert(tk.END, item)
 
         global statefips
@@ -341,10 +364,10 @@ class PageState(tk.Frame):
 
         button = tk.Button(self, text="Go back", font="Helvetica", height=2,
                            command=lambda: controller.show_frame(PageOne))
-        button2 = tk.Button(self, text="Continue", state='disabled', font="Helvetica", height=2,
-                            command=lambda: controller.show_frame(PageTwo))
+        button2 = tk.Button(self, text="Continue", state='normal', font="Helvetica", height=2,
+                            command=lambda: select())
 
-        button_choosestate.pack(side="top")
+        #button_choosestate.pack(side="top")
         button.place(relx=0, rely=1, anchor='sw')
         button2.place(relx=1, rely=1, anchor='se')
 
@@ -357,7 +380,10 @@ class PageTwo(tk.Frame):
         button3 = tk.Button(self, text="Continue", font="Helvetica", height=2,
                             command=lambda: controller.show_frame(PageThree))
         button1 = tk.Button(self, text="Go back", font="Helvetica", height=2,
-                            command=lambda: controller.show_frame(PageState))
+                            command=lambda: controller.show_frame(PageWarning))
+
+        dissolve_del_frame = tk.Frame(self)
+        dissolve_del_frame.pack(side="top")
 
 
         def dissolve_button_func():
@@ -406,21 +432,42 @@ class PageTwo(tk.Frame):
             return
 
         def delete():
-            #do something
-            print "DELETED! AGH..."
+            arcpy.Delete_management(tmppath+arcpy.mapping.ListLayers(mxd, "", df)[0].name+".shp", "#")
             return
 
-        dissolve_button = tk.Button(self, text="Create PSU", font="Helvetica", height=2,
+        dissolve_button = tk.Button(dissolve_del_frame, text="Create PSU", font="Helvetica", height=2, width=20,
                                     command=lambda: dissolve_button_func())
 
-        delete_button = tk.Button(self, text="Delete PSU", font="Helvetica", height=2,
+        delete_button = tk.Button(dissolve_del_frame, text="Delete PSU", font="Helvetica", height=2, width=20,
                                     command=lambda: delete())
 
-        dissolve_button.pack(side="top")
-        delete_button.pack(side="top")
+        dissolve_button.pack(side="left", anchor="n", pady=15)
+        delete_button.pack(side="left", anchor="n", pady=15)
 
         button1.place(relx=0, rely=1, anchor='sw')
         button3.place(relx=1, rely=1, anchor='se')
+
+class PageWarning(tk.Frame):
+    def __init__(self, parent, controller):
+        tk.Frame.__init__(self, parent)
+        label = tk.Label(self, text="Warning: This will erase your work.\n\nStill want to go back?", font=TITLE_FONT)
+        label.pack(side="top", fill="x", pady=10)
+        yes_no_frame = tk.Frame(self)
+        yes_no_frame.pack(side="top", pady=15)
+        button3 = tk.Button(yes_no_frame, text="No", font="Helvetica", height=2, width=15,
+                            command=lambda: controller.show_frame(PageTwo))
+        button1 = tk.Button(yes_no_frame, text="Yes", font="Helvetica", height=2, width=15,
+                            command=lambda: backstate())
+
+        def backstate():
+            controller.show_frame(PageState)
+            for x in arcpy.mapping.ListLayers(mxd, "", df):
+                arcpy.mapping.RemoveLayer(df, x)
+            return
+
+        button1.pack(side="left")
+        button3.pack(side="left")
+
 
 class PageThree(tk.Frame):
     def __init__(self, parent, controller):
@@ -429,21 +476,108 @@ class PageThree(tk.Frame):
         label.pack(side="top", fill="x", pady=10)
 
         def export_button_func():
-            # do something
+            #merge PSUs
+            arcpy.env.workspace = tmppath
+            fcList = arcpy.ListFeatureClasses("*psu*", "polygon", "")
+            arcpy.Merge_management(fcList, "PSUmerge.shp")
+
+            #Select counties that overlap PSUs and inverse selection
+            arcpy.SelectLayerByLocation_management(name1, "WITHIN", "PSUmerge", "", "NEW_SELECTION")
+            arcpy.SelectLayerByLocation_management(name1, "WITHIN", "PSUmerge", "", "SWITCH_SELECTION")
+
+            #Merge PSUs with Counties
+            arcpy.Merge_management([name1, "PSUmerge"], outputpath+"allMerge.shp")
+            arcpy.SelectLayerByAttribute_management("allMerge", "NEW_SELECTION", """"POPULATION"=0""")
+            arcpy.CalculateField_management("allMerge", "POPULATION", "!SUM_POPULA!", "PYTHON")
+            arcpy.CalculateField_management("allMerge", "ALANDSQM", "!SUM_ALANDS!", "PYTHON")
+
+            #Exporting shapefile to csv (and ignoring umlaut character)
+            u = unichr(253)
+            print "1"
+            u.encode('ascii', 'ignore')
+            print "2"
+            import arcgisscripting, csv
+            print "3"
+            gp=arcgisscripting.create(10.2)
+            print "4"
+            output=open(r""+outputpath+"tableOutput.csv","w")
+            print "5"
+            linewriter=csv.writer(output,delimiter=',')
+            print "6"
+            fcdescribe=gp.Describe(r""+outputpath+"allMerge.shp")
+            print "7"
+            flds=fcdescribe.Fields
+            print "8"
+            header = []
             print "Exported! Agh..."
+            for fld in flds:
+                value=fld.Name
+                header.append(value)
+            linewriter.writerow(header)
+            cursor = gp.searchcursor(r""+outputpath+"allMerge.shp")
+            row = cursor.Next()
+            print "Export 2"
+            while row:
+                line=[]
+                for fld in flds:
+                    value=row.GetValue(fld.Name)
+                    line.append(value)
+                linewriter.writerow(line)
+                del line
+                row=cursor.Next()
+
+            #Zoom to state layer extent
+            #(statelyr variable set to state layer)
+            lyr = arcpy.mapping.ListLayers(mxd, "allMerge", df)[0]
+
+            RankSymLayer="C:\Users\zwhitman\Documents\census\psu_app\input\RankSymbology.lyr"
+            arcpy.ApplySymbologyFromLayer_management(lyr, RankSymLayer)
+
+            #Add SQMI and POPULATION labels
+            # expression = """"S:" & [SQMI] & vbCrLf& "P:" & [POPULATION]"""
+            # lyr.labelClasses[0].expression=expression
+            # for lblClass in lyr.labelClasses:
+            #   lblClass.showClassLabels=True
+            # lyr.showLabels=True
+            # arcpy.RefreshActiveView()
+
+            newExtent=df.extent
+            statelyr_extent=lyr.getExtent()
+            newExtent.XMin=statelyr_extent.XMin
+            newExtent.YMin=statelyr_extent.YMin
+            newExtent.XMax=statelyr_extent.XMax
+            newExtent.YMax=statelyr_extent.YMax
+            df.extent=newExtent
+
+            #Clear Selection
+            arcpy.SelectLayerByAttribute_management(name1,"CLEAR_SELECTION")
+
+            #Export map to pdf
+            arcpy.mapping.ExportToJPEG(mxd, r""+outputpath+"mapOutput.jpg")
+
+            # do something
+            return
+
+        def loopback():
+            controller.show_frame(PageState)
+            for x in arcpy.mapping.ListLayers(mxd, "", df):
+                arcpy.mapping.RemoveLayer(df, x)
             return
 
 
-        export_button = tk.Button(self, text="Export", font="Helvetica", height=2,
+        export_button = tk.Button(self, text="Export", font="Helvetica", height=2, width=20,
                                   command=lambda: export_button_func())
 
+        continue_states = tk.Button(self, text="New State", state='normal', font="Helvetica", height=2,
+                            command=lambda: loopback())
 
-        export_button.pack(side="top")
+        export_button.pack(side="top", pady=15)
 
         button2 = tk.Button(self, text="Go back", font="Helvetica", height=2,
                             command=lambda: controller.show_frame(PageTwo))
 
         button2.place(relx=0, rely=1, anchor='sw')
+        continue_states.place(relx=1, rely=1, anchor='se')
 
 if __name__ == "__main__":
     app = SampleApp()
