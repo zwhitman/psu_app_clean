@@ -122,7 +122,6 @@ class PageOne(tk.Frame):
                 dbf_varfile = variable_file.rsplit('/', 1)[1]
                 dbf_varfile = dbf_varfile[:-3]+"dbf"
                 dbf_varfile = inputpath+dbf_varfile
-                print dbf_varfile
                 arcpy.AddField_management(dbf_varfile, "GEOID_2", "TEXT", "#", "#", "#", "#", "NULLABLE", "NON_REQUIRED", "#")
                 arcpy.CalculateField_management(dbf_varfile, "GEOID_2", "calc(!GEOID!)", "PYTHON_9.3", "def calc(a):\\n     x = a[1:-1] \\n     return x\\n")
                 arcpy.JoinField_management(input_county, "GEOID", dbf_varfile, "GEOID_2", "#")
@@ -170,20 +169,19 @@ class PageState(tk.Frame):
             for x in arcpy.mapping.ListLayers(mxd, "", df):
                 arcpy.mapping.RemoveLayer(df, x)
             items = map(int, listbox.curselection())
+            itemchoice = items[0]
+            global statename
+            statename = statelist[itemchoice]
             # create state temp folder
             global tmp_state_folder
             tmp_state_folder = statename+"_"+re.sub('-', '_', str(uuid.uuid4()))
             global fullpath_tmp_state_folder
             fullpath_tmp_state_folder = tmppath+tmp_state_folder+"/"
-            print fullpath_tmp_state_folder
             arcpy.CreateFolder_management(tmppath, tmp_state_folder)
-            itemchoice = items[0]
             statechoice = str(statefips[itemchoice])
             state_select = "STATEFP = '"+statechoice+"'"
             global name1
             name1 = statelist[itemchoice]+"_"+re.sub('-', '_', str(uuid.uuid4()))
-            global statename
-            statename = statelist[itemchoice]
             global name3
             name3 = fullpath_tmp_state_folder+name1+".shp"
             name2 = "us_counties_joined_3857"
@@ -509,30 +507,20 @@ class PageThree(tk.Frame):
 
             #Exporting shapefile to csv (and ignoring umlaut character)
             u = unichr(253)
-            print "1"
             u.encode('ascii', 'ignore')
-            print "2"
             import arcgisscripting, csv
-            print "3"
             gp=arcgisscripting.create(10.2)
-            print "4"
             output=open(r""+state_output_path+"tableOutput"+statename+"_"+re.sub('-', '_', str(uuid.uuid4()))+".csv","w")
-            print "5"
             linewriter=csv.writer(output,delimiter=',')
-            print "6"
             fcdescribe=gp.Describe(r""+state_output_path+out_merge_file)
-            print "7"
             flds=fcdescribe.Fields
-            print "8"
             header = []
-            print "Exported! Agh..."
             for fld in flds:
                 value=fld.Name
                 header.append(value)
             linewriter.writerow(header)
             cursor = gp.searchcursor(r""+state_output_path+out_merge_file)
             row = cursor.Next()
-            print "Export 2"
             while row:
                 line=[]
                 for fld in flds:
